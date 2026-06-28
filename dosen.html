@@ -113,6 +113,10 @@ textarea{resize:vertical;min-height:80px;}
     <div class="form-group"><label>Inisial dosen</label><input type="text" id="login-inisial" placeholder="cth: AYS" autocomplete="username"></div>
     <div class="form-group"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="doLogin()">Masuk</button>
+    <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--muted);">Belum punya akun? Hubungi koordinator</div>
+    <div style="text-align:center;margin-top:8px;">
+      <button onclick="document.getElementById('modal-lupa-dosen').style.display='flex'" style="border:none;background:none;font-size:12px;color:var(--accent);cursor:pointer;text-decoration:underline;">Lupa password?</button>
+    </div>
   </div>
 </div>
 
@@ -132,6 +136,7 @@ textarea{resize:vertical;min-height:80px;}
         <button class="tab" onclick="switchTab('nilai',this)">✏️ Input Nilai</button>
         <button class="tab" onclick="switchTab('bimbingan',this)">📖 Kartu Bimbingan</button>
       </div>
+      <button class="btn btn-sm" onclick="document.getElementById('modal-ganti-dosen').style.display='flex'">🔑 Password</button>
       <button class="btn btn-sm" onclick="doLogout()">Keluar</button>
     </div>
   </div>
@@ -203,9 +208,36 @@ textarea{resize:vertical;min-height:80px;}
   </div>
 </div>
 
+<!-- MODAL: Lupa Password Dosen -->
+<div id="modal-lupa-dosen" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border-radius:14px;padding:28px;width:380px;max-width:95vw;position:relative;">
+    <button onclick="document.getElementById('modal-lupa-dosen').style.display='none'" style="position:absolute;top:14px;right:14px;border:none;background:none;font-size:20px;cursor:pointer;color:#888;">×</button>
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px;">Reset Password Dosen</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:18px;">Masukkan inisial dan password baru.</div>
+    <div id="lupa-dosen-alert" style="display:none;margin-bottom:12px;"></div>
+    <div class="form-group"><label>Inisial</label><input type="text" id="lupa-dosen-inisial" placeholder="cth: AYS" style="text-transform:uppercase"></div>
+    <div class="form-group"><label>Password Baru</label><input type="password" id="lupa-dosen-pass1" placeholder="Minimal 6 karakter"></div>
+    <div class="form-group"><label>Konfirmasi Password</label><input type="password" id="lupa-dosen-pass2" placeholder="Ulangi password baru"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="resetPasswordDosen()">🔐 Reset Password</button>
+  </div>
+</div>
+
+<!-- MODAL: Ganti Password Dosen (saat sudah login) -->
+<div id="modal-ganti-dosen" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border-radius:14px;padding:28px;width:380px;max-width:95vw;position:relative;">
+    <button onclick="document.getElementById('modal-ganti-dosen').style.display='none'" style="position:absolute;top:14px;right:14px;border:none;background:none;font-size:20px;cursor:pointer;color:#888;">×</button>
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px;">Ganti Password</div>
+    <div id="ganti-dosen-alert" style="display:none;margin-bottom:12px;"></div>
+    <div class="form-group"><label>Password Lama</label><input type="password" id="ganti-dosen-lama" placeholder="Password saat ini"></div>
+    <div class="form-group"><label>Password Baru</label><input type="password" id="ganti-dosen-baru" placeholder="Minimal 6 karakter"></div>
+    <div class="form-group"><label>Konfirmasi Password</label><input type="password" id="ganti-dosen-konfirm" placeholder="Ulangi password baru"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="gantiPasswordDosen()">🔐 Simpan Password Baru</button>
+  </div>
+</div>
+
 <script>
-const SUPABASE_URL = 'https://jfigezwgpjdcstfhawmq.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmaWdlendncGpkY3N0Zmhhd21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NjA3MzMsImV4cCI6MjA5ODEzNjczM30.ne8vbzqzXScutIkcqgpAJrSMbNjZN0DXmbxVVCaylzk';
+const SUPABASE_URL = 'https://XXXX.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJXXXX';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
@@ -226,14 +258,19 @@ function loadAdminDB(){
   if(!adminDB){ try{ adminDB=JSON.parse(localStorage.getItem('ta2022_v6')||'null'); }catch(e){} }
 }
 
+function hashPw(pw){ try{ return btoa(unescape(encodeURIComponent(pw))); }catch(e){ return btoa(pw); } }
+
 async function doLogin(){
   const inisial = document.getElementById('login-inisial').value.trim().toUpperCase();
   const pass = document.getElementById('login-pass').value;
   if(!inisial||!pass){ showAuthAlert('Inisial dan password wajib diisi.','danger'); return; }
   showAuthAlert('Memeriksa...','info');
-  const {data,error} = await sb.from('users').select('*').eq('nim_or_inisial',inisial).eq('role','dosen').single();
-  if(error||!data){ showAuthAlert('Inisial tidak ditemukan.','danger'); return; }
-  if(data.password_hash !== btoa(pass)){ showAuthAlert('Password salah.','danger'); return; }
+  const {data,error} = await sb.from('users').select('*').eq('nim_or_inisial',inisial).eq('role','dosen').maybeSingle();
+  if(error){ showAuthAlert('Gagal koneksi: '+error.message,'danger'); return; }
+  if(!data){ showAuthAlert('Inisial tidak ditemukan.','danger'); return; }
+  const hash=data.password_hash||'';
+  const valid=hash===hashPw(pass)||hash===btoa(pass)||hash===hashPw('nim'+inisial.toLowerCase())||hash===btoa('nim'+inisial.toLowerCase());
+  if(!valid){ showAuthAlert('Password salah. Password default = nim + inisial (cth: nimAYS)','danger'); return; }
   currentUser = data;
   localStorage.setItem('portal_dosen', JSON.stringify(data));
   showApp();
@@ -489,6 +526,40 @@ function getGrade(sc){
 async function downloadBerkas(path,nama){
   const {data}=await sb.storage.from('berkas-ta').createSignedUrl(path,60);
   if(data?.signedUrl){ const a=document.createElement('a'); a.href=data.signedUrl; a.download=nama; a.click(); }
+}
+
+async function resetPasswordDosen(){
+  const inisial=document.getElementById('lupa-dosen-inisial').value.trim().toUpperCase();
+  const p1=document.getElementById('lupa-dosen-pass1').value;
+  const p2=document.getElementById('lupa-dosen-pass2').value;
+  const al=document.getElementById('lupa-dosen-alert');
+  al.style.display='none';
+  if(!inisial||!p1||!p2){al.className='alert alert-danger';al.textContent='Semua kolom wajib diisi.';al.style.display='block';return;}
+  if(p1!==p2){al.className='alert alert-danger';al.textContent='Password tidak cocok.';al.style.display='block';return;}
+  if(p1.length<6){al.className='alert alert-danger';al.textContent='Password minimal 6 karakter.';al.style.display='block';return;}
+  const {data,error}=await sb.from('users').update({password_hash:hashPw(p1)}).eq('nim_or_inisial',inisial).eq('role','dosen').select();
+  if(error||!data||!data.length){al.className='alert alert-danger';al.textContent='Inisial tidak ditemukan.';al.style.display='block';return;}
+  al.className='alert alert-success';al.textContent='✅ Password berhasil direset! Silakan login.';al.style.display='block';
+  setTimeout(()=>document.getElementById('modal-lupa-dosen').style.display='none',2000);
+}
+
+async function gantiPasswordDosen(){
+  const lama=document.getElementById('ganti-dosen-lama').value;
+  const baru=document.getElementById('ganti-dosen-baru').value;
+  const konfirm=document.getElementById('ganti-dosen-konfirm').value;
+  const al=document.getElementById('ganti-dosen-alert');
+  al.style.display='none';
+  if(!lama||!baru||!konfirm){al.className='alert alert-danger';al.textContent='Semua kolom wajib diisi.';al.style.display='block';return;}
+  if(baru!==konfirm){al.className='alert alert-danger';al.textContent='Password baru tidak cocok.';al.style.display='block';return;}
+  if(baru.length<6){al.className='alert alert-danger';al.textContent='Password minimal 6 karakter.';al.style.display='block';return;}
+  const {data:u}=await sb.from('users').select('password_hash').eq('id',currentUser.id).single();
+  const hash=u?.password_hash||'';
+  const valid=hash===hashPw(lama)||hash===btoa(lama)||hash===hashPw('nim'+currentUser.nim_or_inisial.toLowerCase())||hash===btoa('nim'+currentUser.nim_or_inisial.toLowerCase());
+  if(!valid){al.className='alert alert-danger';al.textContent='Password lama salah.';al.style.display='block';return;}
+  await sb.from('users').update({password_hash:hashPw(baru)}).eq('id',currentUser.id);
+  al.className='alert alert-success';al.textContent='✅ Password berhasil diubah!';al.style.display='block';
+  ['ganti-dosen-lama','ganti-dosen-baru','ganti-dosen-konfirm'].forEach(id=>document.getElementById(id).value='');
+  setTimeout(()=>document.getElementById('modal-ganti-dosen').style.display='none',2000);
 }
 
 function showAlert(id,msg,type){
