@@ -161,6 +161,37 @@ textarea{resize:vertical;min-height:80px;}
 
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-thumb{background:#ccc;border-radius:2px;}
+
+/* checklist */
+.cl-section{margin-bottom:16px;}
+.cl-section-title{font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--muted);margin-bottom:8px;padding-bottom:6px;
+  border-bottom:1px solid var(--border);}
+.cl-item{display:flex;align-items:center;gap:10px;padding:8px 4px;
+  border-bottom:1px solid #f5f3ef;cursor:pointer;transition:background .1s;border-radius:6px;}
+.cl-item:hover{background:#fafaf8;}
+.cl-item:last-child{border-bottom:none;}
+.cl-check{width:20px;height:20px;border-radius:5px;border:2px solid var(--border2);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-size:13px;transition:all .15s;}
+.cl-check.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.cl-label{font-size:13px;color:var(--text);line-height:1.4;}
+.cl-label.opt{color:var(--muted);}
+.cl-progress{background:#f0eee8;border-radius:20px;height:6px;overflow:hidden;margin-bottom:14px;}
+.cl-progress-fill{height:6px;border-radius:20px;background:var(--accent);transition:width .3s;}
+
+/* modal preview */
+.preview-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:300;align-items:center;justify-content:center;}
+.preview-modal-bg.open{display:flex;}
+.preview-modal-box{background:var(--card);border-radius:12px;
+  width:90vw;max-width:900px;height:88vh;display:flex;flex-direction:column;}
+.preview-modal-head{padding:14px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;}
+.preview-modal-body{flex:1;overflow:hidden;}
+.preview-modal-body iframe{width:100%;height:100%;border:none;}
+.preview-modal-body .preview-img{max-width:100%;max-height:100%;object-fit:contain;
+  display:block;margin:auto;}
 </style>
 </head>
 <body>
@@ -252,6 +283,14 @@ textarea{resize:vertical;min-height:80px;}
   <div id="t-seminar" class="page">
     <div class="card">
       <div class="card-title">
+        <span>✅ Checklist Proposal Seminar</span>
+        <span id="cl-sm-pct" style="font-size:12px;color:var(--muted);">0/0</span>
+      </div>
+      <div class="cl-progress"><div class="cl-progress-fill" id="cl-sm-bar" style="width:0%"></div></div>
+      <div id="cl-seminar-body"><div class="spinner"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
         <span>Pendaftaran Seminar</span>
         <span id="badge-sm2" class="badge b-draft">Draft</span>
       </div>
@@ -259,11 +298,10 @@ textarea{resize:vertical;min-height:80px;}
       <div class="sec-title">Berkas yang sudah diupload</div>
       <div id="list-berkas-seminar"><div class="spinner"></div></div>
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
-        <div class="sec-title">Upload berkas baru</div>
+        <div class="sec-title">Upload berkas baru <span style="color:var(--muted);font-size:11px;">(maks. 10 MB)</span></div>
         <div class="fg"><label>Jenis berkas</label>
           <select id="sel-sm-jenis">
             <option value="proposal">Proposal</option>
-            <option value="checklist_proposal">Checklist Proposal</option>
             <option value="bahan_presentasi">Bahan Presentasi</option>
           </select>
         </div>
@@ -288,6 +326,14 @@ textarea{resize:vertical;min-height:80px;}
   <div id="t-sidang" class="page">
     <div class="card">
       <div class="card-title">
+        <span>✅ Checklist Pendaftaran Sidang</span>
+        <span id="cl-sd-pct" style="font-size:12px;color:var(--muted);">0/0</span>
+      </div>
+      <div class="cl-progress"><div class="cl-progress-fill" id="cl-sd-bar" style="width:0%"></div></div>
+      <div id="cl-sidang-body"><div class="spinner"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
         <span>Pendaftaran Sidang Skripsi</span>
         <span id="badge-sd2" class="badge b-draft">Draft</span>
       </div>
@@ -295,7 +341,7 @@ textarea{resize:vertical;min-height:80px;}
       <div class="sec-title">Berkas yang sudah diupload</div>
       <div id="list-berkas-sidang"><div class="spinner"></div></div>
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
-        <div class="sec-title">Upload berkas baru</div>
+        <div class="sec-title">Upload berkas baru <span style="color:var(--muted);font-size:11px;">(maks. 10 MB)</span></div>
         <div class="fg"><label>Jenis berkas</label>
           <select id="sel-sd-jenis">
             <option value="transkrip_sementara">Transkrip Sementara</option>
@@ -319,6 +365,36 @@ textarea{resize:vertical;min-height:80px;}
     <div class="card">
       <div class="card-title">Template berkas sidang</div>
       <div id="list-tmpl-sidang"><div class="spinner"></div></div>
+    </div>
+    <!-- NASKAH TA FINAL -->
+    <div class="card" style="border:2px solid #6E66DC;">
+      <div class="card-title" style="color:#5a3d9e;">
+        <span>📚 Naskah TA Final (Setelah Sidang)</span>
+        <span id="badge-naskah" class="badge b-draft">Belum upload</span>
+      </div>
+      <div class="alert alert-info" style="margin-bottom:14px;">
+        Upload naskah TA final setelah sidang selesai, beserta bukti persetujuan dari dosen penguji.
+        Masing-masing file maksimal 10 MB.
+      </div>
+      <div id="msg-naskah"></div>
+      <div id="naskah-uploaded" style="margin-bottom:14px;display:none;"></div>
+      <div class="fg"><label>Naskah TA Final (PDF)</label>
+        <label class="file-drop" style="margin-bottom:0;">
+          <input type="file" id="file-naskah" accept=".pdf" onchange="onFileChosen(this,'lbl-naskah')">
+          <div class="file-drop-ico">📘</div>
+          <div class="file-drop-txt" id="lbl-naskah">Klik untuk pilih PDF naskah final</div>
+        </label>
+      </div>
+      <div class="fg" style="margin-top:10px;"><label>Bukti Persetujuan Dosen Penguji (PDF)</label>
+        <label class="file-drop" style="margin-bottom:0;">
+          <input type="file" id="file-persetujuan" accept=".pdf" onchange="onFileChosen(this,'lbl-persetujuan')">
+          <div class="file-drop-ico">✅</div>
+          <div class="file-drop-txt" id="lbl-persetujuan">Klik untuk pilih PDF bukti persetujuan</div>
+        </label>
+      </div>
+      <button class="btn btn-primary" style="margin-top:12px;" onclick="uploadNaskahFinal()">
+        📤 Upload Naskah Final
+      </button>
     </div>
   </div>
 
@@ -619,6 +695,9 @@ async function startApp(){
   loadSesiOptions();
   loadDaftarHadir();
   renderJadwal();
+  loadChecklist('seminar');
+  loadChecklist('sidang');
+  loadNaskahFinal();
 }
 
 // ══════════════════════════════════════════════
@@ -1042,6 +1121,292 @@ function fmtDate(d){
 function onFileChosen(input, lblId){
   if(input.files[0]) document.getElementById(lblId).textContent = '✓ '+input.files[0].name;
 }
+
+// ══════════════════════════════════════════════
+//  CHECKLIST SEMINAR & SIDANG
+// ══════════════════════════════════════════════
+const CL_SEMINAR = [
+  { key:'sampul_depan',     label:'Sampul Depan',             opt:false },
+  { key:'sampul_dalam',     label:'Sampul Dalam',             opt:false },
+  { key:'daftar_isi',       label:'Daftar Isi',               opt:false },
+  { key:'daftar_tabel',     label:'Daftar Tabel',             opt:true  },
+  { key:'daftar_gambar',    label:'Daftar Gambar',            opt:true  },
+  { key:'abstrak',          label:'Abstrak (ID & EN) — draft',opt:false },
+  { key:'pendahuluan',      label:'Pendahuluan',              opt:false },
+  { key:'landasan_teori',   label:'Landasan Teori',           opt:false },
+  { key:'metodologi',       label:'Metodologi',               opt:false },
+  { key:'hasil_sementara',  label:'Hasil Sementara',          opt:false },
+  { key:'daftar_pustaka',   label:'Daftar Pustaka',           opt:false },
+  { key:'lampiran',         label:'Lampiran',                 opt:true  },
+  { key:'nomor_halaman',    label:'Nomor Halaman',            opt:false },
+  { key:'kartu_bimbingan',  label:'Kartu Bimbingan',          opt:false },
+  { key:'format_naskah',    label:'Sesuai format Naskah Seminar',opt:false},
+  { key:'surat_ijin',       label:'Surat ijin penggunaan data dari perusahaan',opt:true},
+];
+
+const CL_SIDANG = [
+  { key:'sampul_depan',     label:'Sampul Depan',             opt:false },
+  { key:'sampul_dalam',     label:'Sampul Dalam',             opt:false },
+  { key:'pernyataan_keaslian',label:'Pernyataan Keaslian Tugas Akhir (draft)',opt:false},
+  { key:'halaman_persetujuan',label:'Halaman Persetujuan (draft)',opt:false},
+  { key:'kata_pengantar',   label:'Kata Pengantar',           opt:false },
+  { key:'daftar_isi',       label:'Daftar Isi',               opt:false },
+  { key:'daftar_tabel',     label:'Daftar Tabel',             opt:false },
+  { key:'daftar_gambar',    label:'Daftar Gambar',            opt:false },
+  { key:'daftar_lampiran',  label:'Daftar Lampiran',          opt:false },
+  { key:'daftar_singkatan', label:'Daftar Singkatan',         opt:true  },
+  { key:'abstrak',          label:'Abstrak (ID & EN)',         opt:false },
+  { key:'pendahuluan',      label:'Pendahuluan',              opt:false },
+  { key:'landasan_teori',   label:'Landasan Teori',           opt:false },
+  { key:'metodologi',       label:'Metodologi',               opt:false },
+  { key:'analisis',         label:'Analisis',                 opt:false },
+  { key:'kesimpulan_saran', label:'Kesimpulan dan Saran',     opt:false },
+  { key:'daftar_pustaka',   label:'Daftar Pustaka',           opt:false },
+  { key:'lampiran',         label:'Lampiran',                 opt:true  },
+  { key:'nomor_halaman',    label:'Nomor Halaman',            opt:false },
+  { key:'plagiarisme_cek',  label:'Plagiarisme Cek',          opt:false },
+  { key:'kartu_bimbingan',  label:'Kartu Bimbingan',          opt:false },
+  { key:'format_artikel',   label:'Format Artikel Ilmiah Bab 1-5',opt:false},
+  { key:'halaman_publikasi',label:'Halaman persetujuan publikasi tugas akhir',opt:false},
+  { key:'tata_bahasa',      label:'Tata bahasa sudah baik dan benar',opt:false},
+];
+
+let clSeminar = {};  // {key: boolean}
+let clSidang  = {};
+
+async function loadChecklist(tipe){
+  const tbl    = tipe==='seminar' ? 'checklist_seminar' : 'checklist_sidang';
+  const items  = tipe==='seminar' ? CL_SEMINAR : CL_SIDANG;
+  const bodyEl = document.getElementById('cl-'+tipe+'-body');
+
+  try{
+    const { data } = await db().from(tbl).select('*').eq('user_id', ME.id);
+    const map = {};
+    (data||[]).forEach(r => map[r.item_key] = r.checked);
+    if(tipe==='seminar') clSeminar = map;
+    else clSidang = map;
+    renderChecklist(tipe, items, map, bodyEl);
+  }catch(e){
+    bodyEl.innerHTML = '<div class="empty">'+e.message+'</div>';
+  }
+}
+
+function renderChecklist(tipe, items, map, bodyEl){
+  const wajib  = items.filter(i=>!i.opt);
+  const opsional = items.filter(i=>i.opt);
+
+  function makeItems(list){
+    return list.map(item => {
+      const checked = map[item.key]||false;
+      return `<div class="cl-item" onclick="toggleCL('${tipe}','${item.key}',this)">
+        <div class="cl-check ${checked?'on':''}">${checked?'✓':''}</div>
+        <div class="cl-label ${item.opt?'opt':''}">${item.label}${item.opt?' <em style="font-size:11px;color:var(--muted);">(Opsional)</em>':''}</div>
+      </div>`;
+    }).join('');
+  }
+
+  bodyEl.innerHTML = `
+    <div class="cl-section">
+      <div class="cl-section-title">Item Wajib</div>
+      ${makeItems(wajib)}
+    </div>
+    ${opsional.length ? `<div class="cl-section">
+      <div class="cl-section-title">Item Opsional</div>
+      ${makeItems(opsional)}
+    </div>` : ''}`;
+
+  updateClProgress(tipe, items, map);
+}
+
+async function toggleCL(tipe, key, row){
+  const map   = tipe==='seminar' ? clSeminar : clSidang;
+  const tbl   = tipe==='seminar' ? 'checklist_seminar' : 'checklist_sidang';
+  const items = tipe==='seminar' ? CL_SEMINAR : CL_SIDANG;
+  const now   = !map[key];
+  map[key]    = now;
+
+  // Update UI
+  const box = row.querySelector('.cl-check');
+  if(now){ box.classList.add('on'); box.textContent='✓'; }
+  else   { box.classList.remove('on'); box.textContent=''; }
+  updateClProgress(tipe, items, map);
+
+  // Simpan ke Supabase
+  try{
+    await db().from(tbl).upsert({
+      user_id: ME.id, item_key: key, checked: now, updated_at: new Date().toISOString()
+    },{onConflict:'user_id,item_key'});
+  }catch(e){ console.warn('Checklist save error:', e.message); }
+}
+
+function updateClProgress(tipe, items, map){
+  const total   = items.length;
+  const checked = items.filter(i => map[i.key]).length;
+  const pct     = total ? Math.round(checked/total*100) : 0;
+  const barEl   = document.getElementById('cl-'+tipe+'-bar');
+  const pctEl   = document.getElementById('cl-'+tipe+'-pct');
+  if(barEl) barEl.style.width = pct+'%';
+  if(pctEl) pctEl.textContent = checked+'/'+total+' ('+pct+'%)';
+  // Warna bar sesuai progress
+  if(barEl) barEl.style.background = pct===100?'var(--green)':'var(--accent)';
+}
+
+// ══════════════════════════════════════════════
+//  NASKAH TA FINAL
+// ══════════════════════════════════════════════
+async function loadNaskahFinal(){
+  try{
+    const { data } = await db().from('naskah_final').select('*').eq('user_id', ME.id).maybeSingle();
+    if(!data) return;
+    const badge = document.getElementById('badge-naskah');
+    if(badge){ badge.className='badge b-disetujui'; badge.textContent='Sudah diupload ✓'; }
+    const upEl = document.getElementById('naskah-uploaded');
+    if(upEl){
+      upEl.style.display='block';
+      upEl.innerHTML=`
+        <div class="alert alert-ok" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div>✅ Naskah final sudah diupload pada ${fmtDate(data.uploaded_at)}</div>
+          <div style="display:flex;gap:8px;">
+            ${data.storage_path_naskah?`<button class="btn btn-sm" onclick="previewDoc('${data.storage_path_naskah}','Naskah TA Final')">👁 Preview Naskah</button>`:''}
+            ${data.storage_path_persetujuan?`<button class="btn btn-sm" onclick="previewDoc('${data.storage_path_persetujuan}','Bukti Persetujuan')">👁 Preview Persetujuan</button>`:''}
+          </div>
+        </div>`;
+    }
+  }catch(e){}
+}
+
+async function uploadNaskahFinal(){
+  const fileNaskah = document.getElementById('file-naskah').files[0];
+  const filePerset = document.getElementById('file-persetujuan').files[0];
+  const MAX = 10*1024*1024;
+
+  if(!fileNaskah)  { showMsg('msg-naskah','Pilih file naskah TA final.','err'); return; }
+  if(!filePerset)  { showMsg('msg-naskah','Pilih file bukti persetujuan penguji.','err'); return; }
+  if(fileNaskah.size > MAX){ showMsg('msg-naskah','Naskah terlalu besar (maks 10 MB).','err'); return; }
+  if(filePerset.size > MAX){ showMsg('msg-naskah','File persetujuan terlalu besar (maks 10 MB).','err'); return; }
+
+  showMsg('msg-naskah','Mengupload...','info');
+  try{
+    const ts = Date.now();
+    const pathN = `final/${ME.nim_or_inisial}/naskah_${ts}_${fileNaskah.name}`;
+    const pathP = `final/${ME.nim_or_inisial}/persetujuan_${ts}_${filePerset.name}`;
+
+    const [r1,r2] = await Promise.all([
+      db().storage.from('berkas-ta').upload(pathN, fileNaskah, {upsert:true}),
+      db().storage.from('berkas-ta').upload(pathP, filePerset, {upsert:true}),
+    ]);
+    if(r1.error) throw r1.error;
+    if(r2.error) throw r2.error;
+
+    await db().from('naskah_final').upsert({
+      user_id: ME.id,
+      storage_path_naskah: pathN, nama_file_naskah: fileNaskah.name,
+      storage_path_persetujuan: pathP, nama_file_persetujuan: filePerset.name,
+      status: 'submitted', uploaded_at: new Date().toISOString()
+    },{onConflict:'user_id'});
+
+    showMsg('msg-naskah','✅ Naskah TA final berhasil diupload!','ok');
+    document.getElementById('file-naskah').value='';
+    document.getElementById('file-persetujuan').value='';
+    document.getElementById('lbl-naskah').textContent='Klik untuk pilih PDF naskah final';
+    document.getElementById('lbl-persetujuan').textContent='Klik untuk pilih PDF bukti persetujuan';
+    loadNaskahFinal();
+  }catch(e){ showMsg('msg-naskah','Gagal: '+e.message,'err'); }
+}
+
+// ══════════════════════════════════════════════
+//  PREVIEW DOKUMEN
+// ══════════════════════════════════════════════
+async function previewDoc(path, title){
+  openModal('modal-preview');
+  document.getElementById('preview-title').textContent = title;
+  document.getElementById('preview-body').innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+  try{
+    const { data } = await db().storage.from('berkas-ta').createSignedUrl(path, 300);
+    if(!data?.signedUrl) throw new Error('Gagal buat URL');
+    const url = data.signedUrl;
+    document.getElementById('preview-dl-btn').href = url;
+    // Deteksi tipe file
+    const ext = path.split('.').pop().toLowerCase();
+    if(['jpg','jpeg','png','webp'].includes(ext)){
+      document.getElementById('preview-body').innerHTML =
+        `<img src="${url}" class="preview-img" alt="${title}">`;
+    } else {
+      document.getElementById('preview-body').innerHTML =
+        `<iframe src="${url}" title="${title}"></iframe>`;
+    }
+  }catch(e){
+    document.getElementById('preview-body').innerHTML =
+      '<div class="empty">Gagal memuat: '+e.message+'</div>';
+  }
+}
+
+// ══════════════════════════════════════════════
+//  PATCH: jadwal lengkap di dashboard
+// ══════════════════════════════════════════════
+function jadwalItemLengkap(id, tipe, nama, j){
+  // Format: Senin, 12 Januari 2025
+  let tglLengkap = '-';
+  if(j.tgl){
+    try{
+      tglLengkap = new Date(j.tgl).toLocaleDateString('id-ID',{
+        weekday:'long', day:'numeric', month:'long', year:'numeric'
+      });
+    }catch(e){ tglLengkap = j.tgl; }
+  }
+  const stCls = j.status==='Done'?'b-disetujui':j.status==='Fix'?'b-menunggu':'b-draft';
+  return `<div class="jadwal-item">
+    <div class="j-date">
+      <div class="j-day" style="font-size:15px;">${j.tgl?new Date(j.tgl).getDate():'—'}</div>
+      <div class="j-mon">${j.tgl?new Date(j.tgl).toLocaleDateString('id-ID',{month:'short'}):'-'}</div>
+    </div>
+    <div class="j-info">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="j-title">${tipe} — <span class="tag">${id}</span></div>
+        <span class="badge ${stCls}">${j.status||'-'}</span>
+      </div>
+      <div class="j-meta" style="font-weight:500;color:var(--text);margin-top:4px;">${tglLengkap}</div>
+      <div class="j-meta">${[j.jam,j.ruangan].filter(v=>v&&v!=='-').join(' · ')||'Waktu/ruangan belum ditentukan'}</div>
+      <div class="j-meta" style="margin-top:2px;">${nama}</div>
+    </div>
+  </div>`;
+}
+
+// Override renderDashboard untuk pakai format jadwal lengkap
+function renderDashboard(){
+  if(!adminDB) return;
+  const m = adminDB.master?.find(m => m.mhs.some(mh => mh.nim === ME.nim_or_inisial));
+  const el = document.getElementById('d-jadwal-saya');
+  if(!m){ el.innerHTML = '<div class="empty">Data mahasiswa tidak ditemukan</div>'; return; }
+  const js = adminDB.jadwal_seminar?.[m.id] || {};
+  const jd = adminDB.jadwal_sidang ?.[m.id] || {};
+  let html = '';
+  // Tampilkan kedua jadwal milik mahasiswa ini
+  if(js.tgl) html += jadwalItemLengkap(m.id,'Seminar',ME.nama,js);
+  else html += `<div style="padding:10px;background:#f9f8f5;border-radius:8px;font-size:13px;color:var(--muted);margin-bottom:8px;">
+    📅 Jadwal Seminar belum tersedia</div>`;
+  if(jd.tgl) html += jadwalItemLengkap(m.id,'Sidang',ME.nama,jd);
+  else html += `<div style="padding:10px;background:#f9f8f5;border-radius:8px;font-size:13px;color:var(--muted);">
+    📅 Jadwal Sidang belum tersedia</div>`;
+  el.innerHTML = html;
+}
 </script>
+<!-- MODAL PREVIEW DOKUMEN -->
+<div class="preview-modal-bg" id="modal-preview">
+  <div class="preview-modal-box">
+    <div class="preview-modal-head">
+      <span style="font-weight:600;font-size:14px;" id="preview-title">Preview Dokumen</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <a id="preview-dl-btn" href="#" download
+           style="font-size:12px;color:var(--accent);text-decoration:none;">⬇ Download</a>
+        <button onclick="closeModal('modal-preview')"
+                style="border:none;background:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1;">×</button>
+      </div>
+    </div>
+    <div class="preview-modal-body" id="preview-body">
+      <div class="empty">Memuat...</div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
