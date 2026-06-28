@@ -51,6 +51,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .berkas-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
 .berkas-row:last-child{border-bottom:none;}
 .berkas-icon{width:34px;height:34px;border-radius:8px;background:#f0eee8;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.preview-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:300;align-items:center;justify-content:center;}
+.preview-modal-bg.open{display:flex;}
+.preview-modal-box{background:var(--card);border-radius:12px;
+  width:90vw;max-width:960px;height:88vh;display:flex;flex-direction:column;}
+.preview-modal-head{padding:14px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;}
+.preview-modal-body{flex:1;overflow:hidden;}
+.preview-modal-body iframe{width:100%;height:100%;border:none;}
 .berkas-name{flex:1;font-size:13px;font-weight:500;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .berkas-jenis{font-size:10px;color:var(--muted);margin-top:2px;}
 
@@ -276,6 +285,8 @@ async function doLogin(){
   showApp();
 }
 
+function openModal(id){ document.getElementById(id)?.classList.add('open'); }
+function closeModal(id){ document.getElementById(id)?.classList.remove('open'); }
 function doLogout(){
   localStorage.removeItem('portal_dosen');
   currentUser=null;
@@ -355,11 +366,15 @@ async function selectPend(pend){
   // Load berkas
   const {data:berkas} = await sb.from('berkas').select('*').eq('pendaftaran_id',pend.id).order('uploaded_at');
 
-  const labelMap={checklist_proposal:'Checklist Proposal',bahan_presentasi:'Bahan Presentasi',kartu_bimbingan:'Kartu Bimbingan',bukti_hadir_seminar:'Bukti Hadir Seminar',transkrip_sementara:'Transkrip Sementara',artikel_ilmiah:'Artikel Ilmiah',bukti_plagiarisme:'Bukti Cek Plagiarisme',draf_skripsi:'Draf Skripsi'};
+  const labelMap={
+    proposal:'Proposal',bahan_presentasi:'Bahan Presentasi',
+    transkrip_sementara:'Transkrip Sementara',artikel_ilmiah:'Artikel Ilmiah',
+    bukti_plagiarisme:'Bukti Cek Plagiarisme',draf_skripsi:'Draf Naskah Skripsi'
+  };
 
   const required = pend._tipe==='seminar'?
-    ['checklist_proposal','bahan_presentasi','kartu_bimbingan']:
-    ['bukti_hadir_seminar','kartu_bimbingan','transkrip_sementara','bahan_presentasi','artikel_ilmiah','bukti_plagiarisme','draf_skripsi'];
+    ['proposal','bahan_presentasi']:
+    ['transkrip_sementara','bahan_presentasi','artikel_ilmiah','bukti_plagiarisme','draf_skripsi'];
 
   const uploaded = berkas?.map(b=>b.jenis_berkas)||[];
   const checkRows = required.map(r=>{
@@ -369,7 +384,10 @@ async function selectPend(pend){
       <div style="flex:1"><div class="berkas-name">${labelMap[r]||r}</div>
         ${found?`<div class="berkas-jenis">${found.nama_file}</div>`:'<div class="berkas-jenis" style="color:#e24b4a">Belum diupload</div>'}
       </div>
-      ${found?`<button class="btn btn-sm" onclick="downloadBerkas('${found.storage_path}','${found.nama_file}')">⬇ Lihat</button>`:''}
+      ${found?`<div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" onclick="previewDoc('${found.storage_path}','${found.nama_file}')">👁 Preview</button>
+        <button class="btn btn-sm" onclick="downloadBerkas('${found.storage_path}','${found.nama_file}')">⬇</button>
+      </div>`:''}
     </div>`;
   }).join('');
 
@@ -562,6 +580,28 @@ async function gantiPasswordDosen(){
   setTimeout(()=>document.getElementById('modal-ganti-dosen').style.display='none',2000);
 }
 
+async function previewDoc(path, nama){
+  openModal('modal-preview');
+  document.getElementById('preview-title').textContent = nama;
+  document.getElementById('preview-body').innerHTML = '<div style="text-align:center;padding:40px;color:#888;">Memuat...</div>';
+  try{
+    const {data} = await sb.storage.from('berkas-ta').createSignedUrl(path, 300);
+    if(!data?.signedUrl) throw new Error('Gagal buat URL');
+    const url = data.signedUrl;
+    document.getElementById('preview-dl-btn').href = url;
+    const ext = path.split('.').pop().toLowerCase();
+    if(['jpg','jpeg','png','webp'].includes(ext)){
+      document.getElementById('preview-body').innerHTML =
+        `<img src="${url}" style="max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;" alt="${nama}">`;
+    } else {
+      document.getElementById('preview-body').innerHTML =
+        `<iframe src="${url}" style="width:100%;height:100%;border:none;" title="${nama}"></iframe>`;
+    }
+  }catch(e){
+    document.getElementById('preview-body').innerHTML='<div style="text-align:center;padding:40px;color:#888;">Gagal memuat: '+e.message+'</div>';
+  }
+}
+
 function showAlert(id,msg,type){
   const el=document.getElementById(id);
   if(!el) return;
@@ -708,5 +748,18 @@ function renderRekap(){
     })).join('')+'</tbody></table>';
 }
 </script>
+<!-- MODAL PREVIEW DOKUMEN -->
+<div class="preview-modal-bg" id="modal-preview">
+  <div class="preview-modal-box">
+    <div class="preview-modal-head">
+      <span style="font-weight:600;font-size:14px;" id="preview-title">Preview</span>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <a id="preview-dl-btn" href="#" download style="font-size:12px;color:var(--accent);text-decoration:none;">⬇ Download</a>
+        <button onclick="closeModal('modal-preview')" style="border:none;background:none;font-size:22px;cursor:pointer;color:#888;line-height:1;">×</button>
+      </div>
+    </div>
+    <div class="preview-modal-body" id="preview-body"></div>
+  </div>
+</div>
 </body>
 </html>
