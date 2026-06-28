@@ -383,8 +383,8 @@ textarea{resize:vertical;min-height:80px;}
 // ══════════════════════════════════════════════
 //  CONFIG — GANTI DENGAN NILAI SUPABASE ANDA
 // ══════════════════════════════════════════════
-const SUPABASE_URL = 'https://jfigezwgpjdcstfhawmq.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmaWdlendncGpkY3N0Zmhhd21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NjA3MzMsImV4cCI6MjA5ODEzNjczM30.ne8vbzqzXScutIkcqgpAJrSMbNjZN0DXmbxVVCaylzk';
+const SUPABASE_URL = 'https://XXXX.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJXXXX';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Data admin dari localStorage (dibaca dari sistem nilai yang sudah ada)
@@ -415,20 +415,37 @@ function loadAdminDB(){
 }
 
 // ── AUTH ──────────────────────────────────────
+// Helper: encode password sama persis dengan cara import
+function hashPw(pw){ try{ return btoa(unescape(encodeURIComponent(pw))); }catch(e){ return btoa(pw); } }
+
 async function doLogin(){
   const nim = document.getElementById('login-nim').value.trim();
   const pass = document.getElementById('login-pass').value;
   if(!nim||!pass){ showAuthAlert('NIM dan password wajib diisi.','danger'); return; }
 
   showAuthAlert('Memeriksa...','info');
+
+  // Coba cari user (case-insensitive untuk NIM)
   const {data,error} = await sb.from('users')
-    .select('*').eq('nim_or_inisial',nim).eq('role','mahasiswa').single();
+    .select('*').eq('nim_or_inisial',nim).eq('role','mahasiswa').maybeSingle();
 
-  if(error||!data){ showAuthAlert('NIM tidak ditemukan.','danger'); return; }
+  if(error){ showAuthAlert('Gagal koneksi ke server: '+error.message,'danger'); return; }
+  if(!data){ showAuthAlert('NIM tidak ditemukan. Hubungi koordinator.','danger'); return; }
 
-  // Simple password check (production: gunakan bcrypt di edge function)
-  if(data.password_hash !== btoa(pass)){
-    showAuthAlert('Password salah.','danger'); return;
+  // Cek password — support berbagai format encoding
+  const hash = data.password_hash||'';
+  const inputHash = hashPw(pass);
+  const inputHashSimple = btoa(pass);
+  // juga cek format "nim"+NIM (password default saat import)
+  const defaultHash = hashPw('nim'+nim);
+  const defaultHashSimple = btoa('nim'+nim);
+
+  const valid = hash===inputHash || hash===inputHashSimple
+             || hash===defaultHash || hash===defaultHashSimple;
+
+  if(!valid){
+    showAuthAlert('Password salah. Password default = nim + NIM kamu (cth: nim23102210001)','danger');
+    return;
   }
 
   currentUser = data;
@@ -855,9 +872,11 @@ async function gantiPassword(){
 
   // Verifikasi password lama
   const {data:u}=await sb.from('users').select('password_hash').eq('id',currentUser.id).single();
-  if(!u||u.password_hash!==btoa(lama)){ showAlert('pass-alert','Password lama salah.','danger'); return; }
+  const lamaHash=u?.password_hash||'';
+  const lamaValid=lamaHash===hashPw(lama)||lamaHash===btoa(lama)||lamaHash===hashPw('nim'+currentUser.nim_or_inisial)||lamaHash===btoa('nim'+currentUser.nim_or_inisial);
+  if(!u||!lamaValid){ showAlert('pass-alert','Password lama salah.','danger'); return; }
 
-  await sb.from('users').update({password_hash:btoa(baru)}).eq('id',currentUser.id);
+  await sb.from('users').update({password_hash:hashPw(baru)}).eq('id',currentUser.id);
   showAlert('pass-alert','✅ Password berhasil diubah!','success');
   ['pass-lama','pass-baru','pass-konfirm'].forEach(id=>document.getElementById(id).value='');
 }
@@ -873,7 +892,7 @@ async function resetPassword(){
   if(p1!==p2){ al.className='alert alert-danger';al.textContent='Password tidak cocok.';al.style.display='block'; return; }
   if(p1.length<6){ al.className='alert alert-danger';al.textContent='Password minimal 6 karakter.';al.style.display='block'; return; }
 
-  const {data,error}=await sb.from('users').update({password_hash:btoa(p1)}).eq('nim_or_inisial',nim).eq('role','mahasiswa').select();
+  const {data,error}=await sb.from('users').update({password_hash:hashPw(p1)}).eq('nim_or_inisial',nim).eq('role','mahasiswa').select();
   if(error||!data||!data.length){ al.className='alert alert-danger';al.textContent='NIM tidak ditemukan.';al.style.display='block'; return; }
   al.className='alert alert-success';al.textContent='✅ Password berhasil direset! Silakan login.';al.style.display='block';
   setTimeout(()=>document.getElementById('modal-lupa').style.display='none',2000);
