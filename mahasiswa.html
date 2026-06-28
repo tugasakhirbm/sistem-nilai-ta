@@ -134,6 +134,8 @@ textarea{resize:vertical;min-height:80px;}
     <div class="form-group"><label>NIM</label><input type="text" id="login-nim" placeholder="23102210XXX" autocomplete="username"></div>
     <div class="form-group"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="doLogin()">Masuk</button>
+    <button onclick="testKoneksi()" style="margin-top:8px;width:100%;padding:7px;border:1px dashed #ccc;border-radius:8px;background:none;font-size:12px;color:#888;cursor:pointer;">🔍 Test koneksi Supabase</button>
+    <div id="koneksi-result" style="display:none;margin-top:8px;font-size:11px;padding:8px;border-radius:6px;line-height:1.5;"></div>
     <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--muted);">Belum punya akun? Hubungi koordinator TA</div>
     <div style="text-align:center;margin-top:8px;"><button onclick="document.getElementById('modal-lupa').style.display='flex'" style="border:none;background:none;font-size:12px;color:var(--accent);cursor:pointer;text-decoration:underline;">Lupa password?</button></div>
   </div>
@@ -383,22 +385,36 @@ textarea{resize:vertical;min-height:80px;}
 // ══════════════════════════════════════════════
 //  CONFIG — GANTI DENGAN NILAI SUPABASE ANDA
 // ══════════════════════════════════════════════
-const SUPABASE_URL = 'https://jfigezwgpjdcstfhawmq.supabase.co';
+const SUPABASE_URL     = 'https://jfigezwgpjdcstfhawmq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmaWdlendncGpkY3N0Zmhhd21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NjA3MzMsImV4cCI6MjA5ODEzNjczM30.ne8vbzqzXScutIkcqgpAJrSMbNjZN0DXmbxVVCaylzk';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Data admin dari localStorage (dibaca dari sistem nilai yang sudah ada)
-const SK_ADMIN = 'ta2022_v1'; // sesuaikan dengan key angkatan
+// Inisialisasi lazy — tidak langsung createClient agar tidak crash kalau SDK belum siap
+let _sb = null;
+function getSb(){
+  if(_sb) return _sb;
+  try{
+    if(typeof supabase === 'undefined' || !supabase.createClient)
+      throw new Error('Supabase SDK belum termuat');
+    if(SUPABASE_URL.includes('XXXX') || SUPABASE_ANON_KEY.includes('XXXX'))
+      throw new Error('SUPABASE_URL / SUPABASE_ANON_KEY belum diisi di file mahasiswa.html');
+    _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    return _sb;
+  } catch(e){
+    return null;
+  }
+}
 
 let currentUser = null;
-let adminDB = null;
+let adminDB     = null;
 let pendSeminar = null;
-let pendSidang = null;
+let pendSidang  = null;
 
 // ── INIT ──────────────────────────────────────
-window.onload = async () => {
-  const saved = localStorage.getItem('portal_user');
-  if(saved){ currentUser = JSON.parse(saved); showApp(); }
+window.onload = () => {
+  try{
+    const saved = localStorage.getItem('portal_user');
+    if(saved){ currentUser = JSON.parse(saved); showApp(); return; }
+  }catch(e){}
   loadAdminDB();
 };
 
@@ -415,42 +431,66 @@ function loadAdminDB(){
 }
 
 // ── AUTH ──────────────────────────────────────
-// Helper: encode password sama persis dengan cara import
-function hashPw(pw){ try{ return btoa(unescape(encodeURIComponent(pw))); }catch(e){ return btoa(pw); } }
+function hashPw(pw){ try{ return btoa(pw); }catch(e){ return ''; } }
 
 async function doLogin(){
-  const nim = document.getElementById('login-nim').value.trim();
-  const pass = document.getElementById('login-pass').value;
-  if(!nim||!pass){ showAuthAlert('NIM dan password wajib diisi.','danger'); return; }
+  const nim  = (document.getElementById('login-nim').value||'').trim();
+  const pass = document.getElementById('login-pass').value||'';
 
-  showAuthAlert('Memeriksa...','info');
+  if(!nim||!pass){
+    showAuthAlert('NIM dan password wajib diisi.','danger'); return;
+  }
 
-  // Coba cari user (case-insensitive untuk NIM)
-  const {data,error} = await sb.from('users')
-    .select('*').eq('nim_or_inisial',nim).eq('role','mahasiswa').maybeSingle();
-
-  if(error){ showAuthAlert('Gagal koneksi ke server: '+error.message,'danger'); return; }
-  if(!data){ showAuthAlert('NIM tidak ditemukan. Hubungi koordinator.','danger'); return; }
-
-  // Cek password — support berbagai format encoding
-  const hash = data.password_hash||'';
-  const inputHash = hashPw(pass);
-  const inputHashSimple = btoa(pass);
-  // juga cek format "nim"+NIM (password default saat import)
-  const defaultHash = hashPw('nim'+nim);
-  const defaultHashSimple = btoa('nim'+nim);
-
-  const valid = hash===inputHash || hash===inputHashSimple
-             || hash===defaultHash || hash===defaultHashSimple;
-
-  if(!valid){
-    showAuthAlert('Password salah. Password default = nim + NIM kamu (cth: nim23102210001)','danger');
+  // Cek Supabase siap
+  const db = getSb();
+  if(!db){
+    if(SUPABASE_URL.includes('XXXX')){
+      showAuthAlert('❌ Supabase belum dikonfigurasi.\n\nBuka file mahasiswa.html di Notepad/VS Code, cari baris SUPABASE_URL dan SUPABASE_ANON_KEY, lalu isi dengan nilai dari Supabase Dashboard → Settings → API.','danger');
+    } else {
+      showAuthAlert('❌ Supabase SDK gagal dimuat. Pastikan internet tersambung dan coba refresh halaman.','danger');
+    }
     return;
   }
 
-  currentUser = data;
-  localStorage.setItem('portal_user', JSON.stringify(data));
-  showApp();
+  showAuthAlert('Memeriksa...','info');
+
+  try{
+    const {data, error} = await db.from('users')
+      .select('*')
+      .eq('nim_or_inisial', nim)
+      .eq('role','mahasiswa')
+      .maybeSingle();
+
+    if(error){
+      showAuthAlert('Error dari server: '+error.message+'\n\nKemungkinan penyebab: RLS belum dinonaktifkan. Jalankan di Supabase SQL Editor:\nalter table users disable row level security;','danger');
+      return;
+    }
+    if(!data){
+      showAuthAlert('NIM "'+nim+'" tidak ditemukan.\n\nPastikan akun sudah diimport oleh koordinator melalui dashboard admin → Kelola Akun → Import dari Data TA.','danger');
+      return;
+    }
+
+    // Cek password — support semua kemungkinan format
+    const stored = data.password_hash||'';
+    const tries  = [
+      btoa(pass),             // password langsung
+      btoa('nim'+nim),        // format default import
+    ];
+    const valid = tries.includes(stored);
+
+    if(!valid){
+      showAuthAlert('Password salah.\n\nPassword default: nim + NIM (cth: nim23102210001 untuk NIM 23102210001).\n\nKalau sudah ganti password sebelumnya, gunakan password yang baru.','danger');
+      return;
+    }
+
+    currentUser = data;
+    localStorage.setItem('portal_user', JSON.stringify(data));
+    loadAdminDB();
+    showApp();
+
+  } catch(e){
+    showAuthAlert('Terjadi error tak terduga: '+e.message,'danger');
+  }
 }
 
 function doLogout(){
@@ -458,6 +498,42 @@ function doLogout(){
   currentUser = null;
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('app').style.display='none';
+}
+
+async function testKoneksi(){
+  const el = document.getElementById('koneksi-result');
+  el.style.display='block';
+  el.style.background='#fef3d0'; el.style.color='#7a5200';
+  el.textContent='Memeriksa koneksi...';
+
+  // 1. Cek URL valid
+  if(SUPABASE_URL.includes('XXXX') || SUPABASE_ANON_KEY.includes('XXXX')){
+    el.style.background='#fde0e0'; el.style.color='#8a1a1a';
+    el.innerHTML='❌ SUPABASE_URL / SUPABASE_ANON_KEY belum diisi!<br><br>Buka file mahasiswa.html dan isi dengan nilai dari:<br>Supabase Dashboard → Settings → API';
+    return;
+  }
+
+  // 2. Cek SDK termuat
+  if(typeof supabase === 'undefined'){
+    el.style.background='#fde0e0'; el.style.color='#8a1a1a';
+    el.innerHTML='❌ Supabase SDK tidak termuat.<br>Pastikan internet tersambung.'; return;
+  }
+
+  // 3. Test query
+  try{
+    const db = getSb();
+    const {data, error} = await db.from('users').select('id',{count:'exact'}).eq('role','mahasiswa');
+    if(error){
+      el.style.background='#fde0e0'; el.style.color='#8a1a1a';
+      el.innerHTML='❌ Error: '+error.message+'<br><br>Coba jalankan di Supabase SQL Editor:<br><code>alter table users disable row level security;</code>';
+    } else {
+      el.style.background='#d4f0d7'; el.style.color='#1a6b25';
+      el.innerHTML='✅ Koneksi OK! Akun mahasiswa: <strong>'+(data?.length||0)+'</strong><br>'+((!data||data.length===0)?'→ Lakukan Import di dashboard admin dulu.':'→ Coba login dengan NIM dan password default nim+NIM.');
+    }
+  } catch(e){
+    el.style.background='#fde0e0'; el.style.color='#8a1a1a';
+    el.innerHTML='❌ Gagal terhubung: '+e.message;
+  }
 }
 
 function showAuthAlert(msg,type){
@@ -546,8 +622,8 @@ function loadNilai(){
 // ── PENDAFTARAN ───────────────────────────────
 async function loadPendaftaran(){
   if(!currentUser) return;
-  const {data:pSm} = await sb.from('pendaftaran_seminar').select('*').eq('user_id',currentUser.id).maybeSingle();
-  const {data:pSd} = await sb.from('pendaftaran_sidang').select('*').eq('user_id',currentUser.id).maybeSingle();
+  const {data:pSm} = await getSb().from('pendaftaran_seminar').select('*').eq('user_id',currentUser.id).maybeSingle();
+  const {data:pSd} = await getSb().from('pendaftaran_sidang').select('*').eq('user_id',currentUser.id).maybeSingle();
   pendSeminar = pSm;
   pendSidang = pSd;
   updateBadge('seminar', pSm?.status||'draft');
@@ -581,7 +657,7 @@ async function loadBerkas(tipe){
   const listEl = document.getElementById('berkas-'+tipe+'-list');
   if(!pendId){ listEl.innerHTML='<div style="color:var(--muted);font-size:13px;padding:10px 0">Belum ada berkas diupload.</div>'; return; }
 
-  const {data} = await sb.from('berkas').select('*').eq('pendaftaran_id',pendId).order('uploaded_at');
+  const {data} = await getSb().from('berkas').select('*').eq('pendaftaran_id',pendId).order('uploaded_at');
   if(!data||!data.length){ listEl.innerHTML='<div style="color:var(--muted);font-size:13px;padding:10px 0">Belum ada berkas diupload.</div>'; return; }
 
   const labelMap={
@@ -616,7 +692,7 @@ async function uploadBerkas(tipe){
   if(!pendId){
     const tbl = tipe==='seminar'?'pendaftaran_seminar':'pendaftaran_sidang';
     const mhsData = getMhsData();
-    const {data:pNew,error:pErr} = await sb.from(tbl).insert({
+    const {data:pNew,error:pErr} = await getSb().from(tbl).insert({
       user_id:currentUser.id, sesi_id:mhsData?.id||'', status:'draft'
     }).select().single();
     if(pErr){ showAlert(tipe+'-alert','Gagal membuat pendaftaran: '+pErr.message,'danger'); return; }
@@ -625,10 +701,10 @@ async function uploadBerkas(tipe){
   }
 
   const path = `${currentUser.nim_or_inisial}/${tipe}/${jenis}_${Date.now()}_${file.name}`;
-  const {error:upErr} = await sb.storage.from('berkas-ta').upload(path, file, {upsert:true});
+  const {error:upErr} = await getSb().storage.from('berkas-ta').upload(path, file, {upsert:true});
   if(upErr){ showAlert(tipe+'-alert','Gagal upload: '+upErr.message,'danger'); return; }
 
-  await sb.from('berkas').insert({
+  await getSb().from('berkas').insert({
     user_id:currentUser.id, pendaftaran_id:pendId,
     tipe_pendaftaran:tipe, jenis_berkas:jenis,
     nama_file:file.name, storage_path:path, ukuran:file.size
@@ -642,12 +718,12 @@ async function uploadBerkas(tipe){
 
 async function hapusBerkas(id, tipe){
   if(!confirm('Hapus berkas ini?')) return;
-  await sb.from('berkas').delete().eq('id',id);
+  await getSb().from('berkas').delete().eq('id',id);
   loadBerkas(tipe);
 }
 
 async function downloadBerkas(path, nama){
-  const {data} = await sb.storage.from('berkas-ta').createSignedUrl(path, 60);
+  const {data} = await getSb().storage.from('berkas-ta').createSignedUrl(path, 60);
   if(data?.signedUrl){ const a=document.createElement('a'); a.href=data.signedUrl; a.download=nama; a.click(); }
 }
 
@@ -657,7 +733,7 @@ async function submitPendaftaran(tipe){
   if(!confirm('Ajukan pendaftaran '+tipe+' ke dosen pembimbing?')) return;
 
   const tbl = tipe==='seminar'?'pendaftaran_seminar':'pendaftaran_sidang';
-  await sb.from(tbl).update({status:'menunggu',submitted_at:new Date().toISOString()}).eq('id',pendId);
+  await getSb().from(tbl).update({status:'menunggu',submitted_at:new Date().toISOString()}).eq('id',pendId);
   if(tipe==='seminar') pendSeminar.status='menunggu'; else pendSidang.status='menunggu';
   updateBadge(tipe,'menunggu');
   showAlert(tipe+'-alert','✅ Pendaftaran diajukan! Menunggu review dosen.','success');
@@ -666,7 +742,7 @@ async function submitPendaftaran(tipe){
 // ── KARTU BIMBINGAN ───────────────────────────
 async function loadKB(){
   if(!currentUser) return;
-  const {data} = await sb.from('kartu_bimbingan').select('*').eq('user_id',currentUser.id).order('tanggal',{ascending:false});
+  const {data} = await getSb().from('kartu_bimbingan').select('*').eq('user_id',currentUser.id).order('tanggal',{ascending:false});
   const el = document.getElementById('kb-list');
   if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:10px 0">Belum ada catatan bimbingan.</div>'; return; }
   el.innerHTML = data.map(kb=>`
@@ -703,7 +779,7 @@ async function saveKB(){
   else if(dosenVal==='ps2'&&mhsData) dosenLabel=(mhsData.ps2||'PS2')+(adminDB?.dosen?.[mhsData.ps2]?' ('+adminDB.dosen[mhsData.ps2].split(',')[0]+')':'');
   else if(mhsData) dosenLabel='PS1+PS2: '+(mhsData.ps1||'')+(mhsData.ps2?' & '+mhsData.ps2:'');
 
-  await sb.from('kartu_bimbingan').insert({
+  await getSb().from('kartu_bimbingan').insert({
     user_id:currentUser.id, dosen_id:null,
     tanggal:tgl, topik, catatan:((catatan?catatan+'
 ':'')+'[Bimbingan dengan: '+dosenLabel+']')
@@ -743,10 +819,10 @@ async function uploadHadir(){
 
   showAlert('hadir-alert','Mengupload...','info');
   const path = `hadir/${sesi}/${currentUser.nim_or_inisial}_${Date.now()}_${file.name}`;
-  const {error} = await sb.storage.from('berkas-ta').upload(path, file, {upsert:true});
+  const {error} = await getSb().storage.from('berkas-ta').upload(path, file, {upsert:true});
   if(error){ showAlert('hadir-alert','Gagal: '+error.message,'danger'); return; }
 
-  await sb.from('bukti_hadir').upsert({
+  await getSb().from('bukti_hadir').upsert({
     user_id:currentUser.id, sesi_seminar_id:sesi,
     storage_path:path, nama_file:file.name
   },{onConflict:'user_id,sesi_seminar_id'});
@@ -761,7 +837,7 @@ async function loadDaftarHadir(){
   const el = document.getElementById('daftar-hadir-list');
   el.innerHTML='<div class="loading"><div class="spinner"></div></div>';
 
-  let q = sb.from('bukti_hadir').select('*,users(nama,nim_or_inisial)').order('uploaded_at',{ascending:false});
+  let q = getSb().from('bukti_hadir').select('*,users(nama,nim_or_inisial)').order('uploaded_at',{ascending:false});
   if(sesi) q=q.eq('sesi_seminar_id',sesi);
   const {data} = await q;
 
@@ -779,7 +855,7 @@ async function loadDaftarHadir(){
 // ── TEMPLATE ──────────────────────────────────
 async function loadTemplates(tipe){
   const el = document.getElementById('template-'+tipe+'-list');
-  const {data} = await sb.from('template_berkas').select('*').eq('jenis',tipe).order('uploaded_at',{ascending:false});
+  const {data} = await getSb().from('template_berkas').select('*').eq('jenis',tipe).order('uploaded_at',{ascending:false});
   if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;">Belum ada template. Hubungi koordinator.</div>'; return; }
   el.innerHTML = data.map(t=>`
     <div class="berkas-item">
@@ -871,12 +947,12 @@ async function gantiPassword(){
   if(baru.length<6){ showAlert('pass-alert','Password minimal 6 karakter.','danger'); return; }
 
   // Verifikasi password lama
-  const {data:u}=await sb.from('users').select('password_hash').eq('id',currentUser.id).single();
+  const {data:u}=await getSb().from('users').select('password_hash').eq('id',currentUser.id).single();
   const lamaHash=u?.password_hash||'';
   const lamaValid=lamaHash===hashPw(lama)||lamaHash===btoa(lama)||lamaHash===hashPw('nim'+currentUser.nim_or_inisial)||lamaHash===btoa('nim'+currentUser.nim_or_inisial);
   if(!u||!lamaValid){ showAlert('pass-alert','Password lama salah.','danger'); return; }
 
-  await sb.from('users').update({password_hash:hashPw(baru)}).eq('id',currentUser.id);
+  await getSb().from('users').update({password_hash:hashPw(baru)}).eq('id',currentUser.id);
   showAlert('pass-alert','✅ Password berhasil diubah!','success');
   ['pass-lama','pass-baru','pass-konfirm'].forEach(id=>document.getElementById(id).value='');
 }
@@ -892,7 +968,7 @@ async function resetPassword(){
   if(p1!==p2){ al.className='alert alert-danger';al.textContent='Password tidak cocok.';al.style.display='block'; return; }
   if(p1.length<6){ al.className='alert alert-danger';al.textContent='Password minimal 6 karakter.';al.style.display='block'; return; }
 
-  const {data,error}=await sb.from('users').update({password_hash:hashPw(p1)}).eq('nim_or_inisial',nim).eq('role','mahasiswa').select();
+  const {data,error}=await getSb().from('users').update({password_hash:hashPw(p1)}).eq('nim_or_inisial',nim).eq('role','mahasiswa').select();
   if(error||!data||!data.length){ al.className='alert alert-danger';al.textContent='NIM tidak ditemukan.';al.style.display='block'; return; }
   al.className='alert alert-success';al.textContent='✅ Password berhasil direset! Silakan login.';al.style.display='block';
   setTimeout(()=>document.getElementById('modal-lupa').style.display='none',2000);
