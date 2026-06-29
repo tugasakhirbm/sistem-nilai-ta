@@ -1049,10 +1049,16 @@ async function saveKB(){
 // ══════════════════════════════════════════════
 function loadSesiOptions(){
   if(!adminDB?.master) return;
-  const opts = adminDB.master.map(m => {
+  // Filter hanya sesi dari angkatan yang sama dengan mahasiswa login
+  const angkatan = ME?.angkatan||'';
+  const masterFiltered = adminDB.master;
+  // Kita tampilkan semua sesi agar bisa hadir di seminar teman satu angkatan
+  const opts = masterFiltered.map(m => {
     const nl  = m.mhs.map(x=>x.nama).join(' & ');
     const js  = adminDB.jadwal_seminar?.[m.id];
-    const tgl = js?.tgl ? new Date(js.tgl).toLocaleDateString('id-ID',{day:'numeric',month:'short'}) : '-';
+    const tgl = js?.tgl ? new Date(js.tgl).toLocaleDateString('id-ID',{
+      weekday:'short', day:'numeric', month:'short', year:'numeric'
+    }) : 'Belum dijadwalkan';
     return `<option value="${m.id}">${m.id} — ${nl} (${tgl})</option>`;
   }).join('');
   ['sel-hadir-sesi','sel-hadir-filter'].forEach(id => {
@@ -1111,10 +1117,13 @@ function renderJadwal(){
   const q    = (document.getElementById('jadwal-q')?.value||'').toLowerCase();
   const tipe = document.getElementById('jadwal-tipe')?.value||'';
   const sort = document.getElementById('jadwal-sort')?.value||'asc';
+  // Filter per angkatan mahasiswa yang sedang login
+  const angkatan = ME?.angkatan||'';
 
   let items = [];
   adminDB.master.forEach(m => {
     const nl = m.mhs.map(x=>x.nama).join(' & ');
+    // Hanya tampilkan sesi yang angkatannya sama dengan mahasiswa login
     if(q && !nl.toLowerCase().includes(q) && !m.mhs.some(mh=>mh.nim.includes(q))) return;
     const js = adminDB.jadwal_seminar?.[m.id]||{};
     const jd = adminDB.jadwal_sidang ?.[m.id]||{};
@@ -1124,30 +1133,16 @@ function renderJadwal(){
 
   items.sort((a,b) => {
     if(sort==='nama') return a.nl.localeCompare(b.nl);
-    const da=a.j.tgl?new Date(a.j.tgl):new Date(0), db=b.j.tgl?new Date(b.j.tgl):new Date(0);
-    return sort==='desc' ? db-da : da-db;
+    const da=a.j.tgl?new Date(a.j.tgl):new Date(0), db2=b.j.tgl?new Date(b.j.tgl):new Date(0);
+    return sort==='desc' ? db2-da : da-db2;
   });
 
-  const html = items.map(x=>jadwalItem(x.id,x.tipe,x.nl,x.j)).join('');
-  document.getElementById('list-jadwal').innerHTML = html||'<div class="empty">Tidak ada jadwal</div>';
+  const html = items.map(x=>jadwalItemLengkap(x.id,x.tipe,x.nl,x.j)).join('');
+  document.getElementById('list-jadwal').innerHTML = html||'<div class="empty">Tidak ada jadwal ditemukan</div>';
 }
 
 function jadwalItem(id, tipe, nama, j){
-  const d   = j.tgl ? new Date(j.tgl) : null;
-  const day = d ? d.getDate() : '—';
-  const mon = d ? d.toLocaleDateString('id-ID',{month:'short'}) : '-';
-  const stCls = j.status==='Done'?'b-disetujui':j.status==='Fix'?'b-menunggu':'b-draft';
-  return `<div class="jadwal-item">
-    <div class="j-date"><div class="j-day">${day}</div><div class="j-mon">${mon}</div></div>
-    <div class="j-info">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="j-title">${tipe} — ${id}</div>
-        <span class="badge ${stCls}">${j.status||'-'}</span>
-      </div>
-      <div class="j-meta">${nama}</div>
-      <div class="j-meta">${[j.jam,j.ruangan].filter(Boolean).join(' · ')}</div>
-    </div>
-  </div>`;
+  return jadwalItemLengkap(id, tipe, nama, j);
 }
 
 // ══════════════════════════════════════════════
@@ -1209,14 +1204,24 @@ let myPengajuan = null;
 
 async function loadPengajuan(){
   try{
-    const { data } = await db().from('pengajuan_ta')
+    const { data, error } = await db().from('pengajuan_ta')
       .select('*').eq('user_id', ME.id).maybeSingle();
+    if(error){
+      // Tabel mungkin belum dibuat — tampilkan pesan informatif
+      if(error.message.includes('does not exist') || error.message.includes('relation')){
+        document.getElementById('peng-status-body').innerHTML =
+          '<div class="alert alert-warn">⚠️ Tabel pengajuan belum dibuat di Supabase. Jalankan file <strong>schema_pengajuan.sql</strong> di Supabase SQL Editor terlebih dahulu.</div>';
+      }
+      return;
+    }
     myPengajuan = data;
     renderPengajuanStatus();
     renderPengajuanForm();
     renderTracker();
     renderDashboardDosen();
-  }catch(e){ console.warn('loadPengajuan error:', e.message); }
+  }catch(e){
+    console.warn('loadPengajuan error:', e.message);
+  }
 }
 
 function renderPengajuanStatus(){
