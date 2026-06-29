@@ -922,19 +922,6 @@ function showCat(id, text){
 // ══════════════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════════════
-function renderDashboard(){
-  if(!adminDB) return;
-  const m = adminDB.master?.find(m => m.mhs.some(mh => mh.nim === ME.nim_or_inisial));
-  const el = document.getElementById('d-jadwal-saya');
-  if(!m){ el.innerHTML = '<div class="empty">Data mahasiswa tidak ditemukan di sistem</div>'; return; }
-  const js = adminDB.jadwal_seminar?.[m.id] || {};
-  const jd = adminDB.jadwal_sidang ?.[m.id] || {};
-  let html = '';
-  if(js.tgl) html += jadwalItem(m.id,'Seminar',ME.nama,js);
-  if(jd.tgl) html += jadwalItem(m.id,'Sidang', ME.nama,jd);
-  el.innerHTML = html || '<div class="empty">Jadwal belum tersedia</div>';
-}
-
 // ══════════════════════════════════════════════
 //  BERKAS
 // ══════════════════════════════════════════════
