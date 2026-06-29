@@ -322,6 +322,38 @@ textarea{resize:vertical;min-height:80px;}
     <div class="card">
       <div class="card-title">Informasi Tugas Akhir</div>
       <div id="msg-pengajuan"></div>
+
+      <!-- Jenis TA -->
+      <div class="fg">
+        <label>Jenis TA</label>
+        <div style="display:flex;gap:10px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="radio" name="peng-jenis" value="Individu" checked onchange="toggleJenisTa(this.value)"> Individu
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="radio" name="peng-jenis" value="Kelompok" onchange="toggleJenisTa(this.value)"> Kelompok (2 orang)
+          </label>
+        </div>
+      </div>
+
+      <!-- Partner kelompok -->
+      <div id="partner-block" style="display:none;background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:10px;text-transform:uppercase;letter-spacing:.03em;">Anggota Kelompok</div>
+        <div style="font-size:13px;font-weight:500;margin-bottom:8px;">
+          Mahasiswa 1: <span style="color:var(--accent)" id="peng-mhs1-nama">—</span>
+          <span style="font-size:11px;color:var(--muted)" id="peng-mhs1-nim"></span>
+        </div>
+        <div class="fg" style="margin:0;">
+          <label>NIM Mahasiswa 2</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="peng-partner-nim" placeholder="Masukkan NIM anggota kelompok..." style="flex:1">
+            <button class="btn btn-sm" onclick="cariPartner()" style="flex-shrink:0;">🔍 Cari</button>
+          </div>
+        </div>
+        <div id="partner-result" style="margin-top:8px;font-size:13px;color:var(--muted);"></div>
+      </div>
+
+      <!-- Info TA -->
       <div class="fg">
         <label>Judul / Topik Sementara TA</label>
         <input type="text" id="peng-judul" placeholder="Tulis judul atau topik yang ingin dikerjakan...">
@@ -331,9 +363,9 @@ textarea{resize:vertical;min-height:80px;}
         <select id="peng-bidang">
           <option value="">— Pilih bidang —</option>
           <option value="Statistika Terapan">Statistika Terapan</option>
-          <option value="Aktuaria & Asuransi">Aktuaria & Asuransi</option>
+          <option value="Aktuaria &amp; Asuransi">Aktuaria &amp; Asuransi</option>
           <option value="Machine Learning / AI">Machine Learning / AI</option>
-          <option value="Keuangan & Ekonometrika">Keuangan & Ekonometrika</option>
+          <option value="Keuangan &amp; Ekonometrika">Keuangan &amp; Ekonometrika</option>
           <option value="Riset Operasi">Riset Operasi</option>
           <option value="Biostatistika">Biostatistika</option>
           <option value="Analisis Data">Analisis Data</option>
@@ -344,12 +376,31 @@ textarea{resize:vertical;min-height:80px;}
         <label>Deskripsi singkat rencana TA</label>
         <textarea id="peng-deskripsi" placeholder="Jelaskan secara singkat apa yang ingin diteliti, metode yang akan digunakan, dan data yang akan dipakai..."></textarea>
       </div>
+
+      <!-- Preferensi dosen -->
+      <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:12px;text-transform:uppercase;letter-spacing:.03em;">Preferensi Dosen Pembimbing</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Pilih preferensi dosen — koordinator akan mempertimbangkan pilihanmu saat assign.</div>
+        <div class="fg">
+          <label>Pembimbing 1 (utama) <span style="color:var(--red);font-size:10px;">wajib</span></label>
+          <select id="peng-ps1"><option value="">— Pilih dosen —</option></select>
+        </div>
+        <div class="fg">
+          <label>Pembimbing 1 Alternatif <span style="color:var(--muted);font-size:10px;">opsional</span></label>
+          <select id="peng-ps1-alt"><option value="">— Tidak ada alternatif —</option></select>
+        </div>
+        <div class="fg" style="margin:0;">
+          <label>Pembimbing 2 <span style="color:var(--muted);font-size:10px;">opsional</span></label>
+          <select id="peng-ps2"><option value="">— Tidak perlu PS2 —</option></select>
+        </div>
+      </div>
+
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="simpanPengajuan('draft')">💾 Simpan Draft</button>
+        <button class="btn" onclick="simpanPengajuan('draft')">💾 Simpan Draft</button>
         <button class="btn btn-primary" onclick="simpanPengajuan('menunggu')" style="background:#1a6b25;border-color:#1a6b25;">📨 Kirim ke Koordinator</button>
       </div>
       <div style="margin-top:8px;font-size:12px;color:var(--muted);">
-        Simpan Draft untuk edit nanti. Kirim ke Koordinator jika sudah yakin — koordinator akan assign dosen pembimbing.
+        Simpan Draft untuk melanjutkan nanti. Kirim jika sudah yakin.
       </div>
     </div>
 
@@ -1207,186 +1258,215 @@ async function loadPengajuan(){
     const { data, error } = await db().from('pengajuan_ta')
       .select('*').eq('user_id', ME.id).maybeSingle();
     if(error){
-      // Tabel mungkin belum dibuat — tampilkan pesan informatif
-      if(error.message.includes('does not exist') || error.message.includes('relation')){
-        document.getElementById('peng-status-body').innerHTML =
-          '<div class="alert alert-warn">⚠️ Tabel pengajuan belum dibuat di Supabase. Jalankan file <strong>schema_pengajuan.sql</strong> di Supabase SQL Editor terlebih dahulu.</div>';
+      if(error.message.includes('does not exist')||error.message.includes('relation')){
+        const el=document.getElementById('peng-status-body');
+        if(el) el.innerHTML='<div class="alert alert-warn">⚠️ Jalankan <strong>schema_pengajuan_v2.sql</strong> di Supabase SQL Editor.</div>';
       }
       return;
     }
     myPengajuan = data;
+    await checkKelompokPartner();
+    await loadDosenEligible();
     renderPengajuanStatus();
     renderPengajuanForm();
     renderTracker();
     renderDashboardDosen();
-  }catch(e){
-    console.warn('loadPengajuan error:', e.message);
+  }catch(e){ console.warn('loadPengajuan:', e.message); }
+}
+
+let dosenEligiblePS1=[], dosenEligiblePS2=[];
+
+async function loadDosenEligible(){
+  try{
+    const angkatan=ME?.angkatan||'2022';
+    const {data}=await db().from('dosen_eligible').select('*').eq('angkatan',angkatan);
+    dosenEligiblePS1=(data||[]).filter(d=>d.eligible_ps1).map(d=>d.inisial);
+    dosenEligiblePS2=(data||[]).filter(d=>d.eligible_ps2).map(d=>d.inisial);
+    const buildOpts=(list,allowEmpty,emptyLabel)=>{
+      let h=allowEmpty?`<option value="">${emptyLabel}</option>`:'';
+      const all=Object.entries(adminDB?.dosen||{}).sort((a,b)=>a[1].localeCompare(b[1]));
+      if(list.length){
+        const ok=all.filter(([k])=>list.includes(k));
+        const rest=all.filter(([k])=>!list.includes(k));
+        if(ok.length){ h+=`<optgroup label="✅ Direkomendasikan">`; ok.forEach(([k,v])=>{ h+=`<option value="${k}">${k} — ${v.split(',')[0]}</option>`; }); h+=`</optgroup>`; }
+        if(rest.length){ h+=`<optgroup label="Dosen lainnya">`; rest.forEach(([k,v])=>{ h+=`<option value="${k}">${k} — ${v.split(',')[0]}</option>`; }); h+=`</optgroup>`; }
+      } else { all.forEach(([k,v])=>{ h+=`<option value="${k}">${k} — ${v.split(',')[0]}</option>`; }); }
+      return h;
+    };
+    const ps1El=document.getElementById('peng-ps1');
+    const ps1AltEl=document.getElementById('peng-ps1-alt');
+    const ps2El=document.getElementById('peng-ps2');
+    if(ps1El) ps1El.innerHTML=buildOpts(dosenEligiblePS1,false,'');
+    if(ps1AltEl) ps1AltEl.innerHTML=buildOpts(dosenEligiblePS1,true,'— Pilih alternatif —');
+    if(ps2El) ps2El.innerHTML=buildOpts(dosenEligiblePS2,true,'— Tidak perlu PS2 —');
+  }catch(e){ console.warn('loadDosenEligible:',e.message); }
+}
+
+async function checkKelompokPartner(){
+  if(!adminDB?.master||!ME) return;
+  const mSesi=adminDB.master.find(m=>m.jenis==='Kelompok'&&m.mhs.some(mh=>mh.nim===ME.nim_or_inisial));
+  if(!mSesi) return;
+  const partner=mSesi.mhs.find(mh=>mh.nim!==ME.nim_or_inisial);
+  if(!partner) return;
+  window._partnerData={nim:partner.nim,nama:partner.nama,sesiId:mSesi.id};
+  const block=document.getElementById('partner-block');
+  if(block){
+    block.style.display='block';
+    block.innerHTML=`
+      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:.03em;">Anggota Kelompok (otomatis dari data master)</div>
+      <div style="padding:10px;background:var(--card);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:13px;font-weight:600">${ME.nama} <span style="font-size:11px;font-weight:400;color:var(--muted)">${ME.nim_or_inisial}</span></div>
+        <div style="font-size:13px;font-weight:600;margin-top:6px">${partner.nama} <span style="font-size:11px;font-weight:400;color:var(--muted)">${partner.nim}</span></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">Anggota kelompok diisi otomatis — <span class="tag">${mSesi.id}</span></div>`;
+    const radioKel=document.querySelector('input[name="peng-jenis"][value="Kelompok"]');
+    if(radioKel) radioKel.checked=true;
   }
+  try{
+    const {data:pu}=await db().from('users').select('id').eq('nim_or_inisial',partner.nim).maybeSingle();
+    if(pu){
+      const {data:pp}=await db().from('pengajuan_ta').select('*').eq('user_id',pu.id).maybeSingle();
+      if(pp&&pp.status!=='draft'&&!myPengajuan){
+        myPengajuan={...pp,id:null,user_id:ME.id};
+        const hint=document.createElement('div');
+        hint.className='alert alert-info'; hint.style.marginTop='8px';
+        hint.innerHTML=`ℹ️ Teman kelompok (${partner.nama}) sudah mengirim pengajuan. Data diisi otomatis — verifikasi dan kirim.`;
+        document.getElementById('peng-status-body')?.appendChild(hint);
+      }
+    }
+  }catch(e){}
+}
+
+function toggleJenisTa(val){
+  const block=document.getElementById('partner-block');
+  if(block) block.style.display=val==='Kelompok'?'block':'none';
 }
 
 function renderPengajuanStatus(){
-  const badge = document.getElementById('peng-badge');
-  const body  = document.getElementById('peng-status-body');
-  if(!badge || !body) return;
-
+  const badge=document.getElementById('peng-badge');
+  const body=document.getElementById('peng-status-body');
+  if(!badge||!body) return;
   if(!myPengajuan){
     badge.className='badge b-draft'; badge.textContent='Belum diisi';
     body.innerHTML='<div class="empty">Isi form di bawah untuk memulai pengajuan</div>';
     return;
   }
-
-  const statusMap = {
-    draft:     {cls:'b-draft',    lbl:'Draft — belum dikirim'},
-    menunggu:  {cls:'b-menunggu', lbl:'Menunggu assign koordinator'},
-    disetujui: {cls:'b-menunggu', lbl:'Dosen sudah di-assign'},
-    final:     {cls:'b-disetujui',lbl:'Final — dosen pembimbing terkonfirmasi'},
-  };
-  const s = statusMap[myPengajuan.status] || statusMap.draft;
-  badge.className = 'badge '+s.cls;
-  badge.textContent = s.lbl;
-
-  // Tampilkan info dosen jika sudah di-assign
-  if(myPengajuan.ps1_inisial && (myPengajuan.status==='disetujui'||myPengajuan.status==='final')){
-    const ps1nama = adminDB?.dosen?.[myPengajuan.ps1_inisial] || myPengajuan.ps1_inisial;
-    const ps2nama = myPengajuan.ps2_inisial
-      ? (adminDB?.dosen?.[myPengajuan.ps2_inisial] || myPengajuan.ps2_inisial) : null;
-    body.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:8px;">
-          <span class="tag">${myPengajuan.ps1_inisial}</span>
-          <div>
-            <div style="font-weight:600;font-size:13px;">PS1 — ${ps1nama.split(',')[0]}</div>
-            <div style="font-size:11px;color:var(--muted);">Pembimbing Utama</div>
-          </div>
-        </div>
-        ${ps2nama ? `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:8px;">
-          <span class="tag">${myPengajuan.ps2_inisial}</span>
-          <div>
-            <div style="font-weight:600;font-size:13px;">PS2 — ${ps2nama.split(',')[0]}</div>
-            <div style="font-size:11px;color:var(--muted);">Pembimbing Pendamping</div>
-          </div>
-        </div>` : ''}
-        ${myPengajuan.catatan_admin ? `<div class="alert alert-info">📝 Catatan koordinator: ${myPengajuan.catatan_admin}</div>` : ''}
-        ${myPengajuan.announced_at ? `<div style="font-size:12px;color:var(--muted);">Diumumkan: ${fmtDate(myPengajuan.announced_at)}</div>` : ''}
+  const stMap={draft:{cls:'b-draft',lbl:'Draft — belum dikirim'},menunggu:{cls:'b-menunggu',lbl:'Menunggu assign koordinator'},disetujui:{cls:'b-menunggu',lbl:'Dosen sudah di-assign'},final:{cls:'b-disetujui',lbl:'Final — terkonfirmasi'}};
+  const s=stMap[myPengajuan.status]||stMap.draft;
+  badge.className='badge '+s.cls; badge.textContent=s.lbl;
+  if(myPengajuan.ps1_inisial&&(myPengajuan.status==='disetujui'||myPengajuan.status==='final')){
+    const p1n=adminDB?.dosen?.[myPengajuan.ps1_inisial]||myPengajuan.ps1_inisial;
+    const p2n=myPengajuan.ps2_inisial?(adminDB?.dosen?.[myPengajuan.ps2_inisial]||myPengajuan.ps2_inisial):null;
+    body.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:8px;">
+        <span class="tag">${myPengajuan.ps1_inisial}</span>
+        <div><div style="font-weight:600;font-size:13px;">PS1 — ${p1n.split(',')[0]}</div><div style="font-size:11px;color:var(--muted)">Pembimbing Utama (Final)</div></div>
+      </div>
+      ${p2n?`<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:8px;">
+        <span class="tag">${myPengajuan.ps2_inisial}</span>
+        <div><div style="font-weight:600;font-size:13px;">PS2 — ${p2n.split(',')[0]}</div><div style="font-size:11px;color:var(--muted)">Pembimbing Pendamping</div></div>
+      </div>`:''}
+      ${myPengajuan.catatan_admin?`<div class="alert alert-info">📝 ${myPengajuan.catatan_admin}</div>`:''}
+    </div>`;
+  } else if(myPengajuan.ps1_pilihan&&myPengajuan.status==='menunggu'){
+    const p1=adminDB?.dosen?.[myPengajuan.ps1_pilihan]||myPengajuan.ps1_pilihan;
+    const p1a=myPengajuan.ps1_alt_pilihan?(adminDB?.dosen?.[myPengajuan.ps1_alt_pilihan]||myPengajuan.ps1_alt_pilihan):null;
+    const p2=myPengajuan.ps2_pilihan?(adminDB?.dosen?.[myPengajuan.ps2_pilihan]||myPengajuan.ps2_pilihan):null;
+    body.innerHTML=`<div style="font-size:13px;color:var(--muted);margin-bottom:8px">⏳ Sedang diproses. Preferensi dikirim:</div>
+      <div style="font-size:13px;padding:10px;background:var(--bg);border-radius:8px;line-height:1.8">
+        <div><strong>PS1:</strong> <span class="tag">${myPengajuan.ps1_pilihan}</span> ${p1.split(',')[0]}</div>
+        ${p1a?`<div><strong>PS1 Alt:</strong> <span class="tag">${myPengajuan.ps1_alt_pilihan}</span> ${p1a.split(',')[0]}</div>`:''}
+        ${p2?`<div><strong>PS2:</strong> <span class="tag">${myPengajuan.ps2_pilihan}</span> ${p2.split(',')[0]}</div>`:''}
       </div>`;
   } else {
-    body.innerHTML = `
-      <div style="font-size:13px;color:var(--muted);padding:8px 0;">
-        ${myPengajuan.status==='menunggu'
-          ? '⏳ Koordinator sedang memproses pengajuan Anda. Dosen pembimbing akan segera di-assign.'
-          : 'Isi dan kirim form pengajuan di bawah.'}
-      </div>`;
+    body.innerHTML=`<div style="font-size:13px;color:var(--muted);padding:8px 0">Isi dan kirim form di bawah.</div>`;
   }
 }
 
 function renderPengajuanForm(){
   if(!myPengajuan) return;
-  if(document.getElementById('peng-judul'))
-    document.getElementById('peng-judul').value = myPengajuan.judul_sementara||'';
-  if(document.getElementById('peng-bidang'))
-    document.getElementById('peng-bidang').value = myPengajuan.bidang_riset||'';
-  if(document.getElementById('peng-deskripsi'))
-    document.getElementById('peng-deskripsi').value = myPengajuan.deskripsi||'';
-  // Lock form jika sudah final
-  const locked = myPengajuan.status==='final';
-  ['peng-judul','peng-bidang','peng-deskripsi'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.disabled = locked;
+  const set=(id,val)=>{ const el=document.getElementById(id); if(el&&val) el.value=val; };
+  set('peng-judul',myPengajuan.judul_sementara);
+  set('peng-bidang',myPengajuan.bidang_riset);
+  set('peng-deskripsi',myPengajuan.deskripsi);
+  set('peng-ps1',myPengajuan.ps1_pilihan);
+  set('peng-ps1-alt',myPengajuan.ps1_alt_pilihan);
+  set('peng-ps2',myPengajuan.ps2_pilihan);
+  if(myPengajuan.jenis_ta){
+    const r=document.querySelector(`input[name="peng-jenis"][value="${myPengajuan.jenis_ta==='kelompok'?'Kelompok':'Individu'}"]`);
+    if(r){ r.checked=true; toggleJenisTa(r.value); }
+  }
+  const locked=myPengajuan.status==='final'||myPengajuan.status==='disetujui';
+  ['peng-judul','peng-bidang','peng-deskripsi','peng-ps1','peng-ps1-alt','peng-ps2'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.disabled=locked;
   });
 }
 
 async function simpanPengajuan(status){
-  const judul   = (document.getElementById('peng-judul')?.value||'').trim();
-  const bidang  = document.getElementById('peng-bidang')?.value||'';
-  const desk    = (document.getElementById('peng-deskripsi')?.value||'').trim();
-
+  const judul=(document.getElementById('peng-judul')?.value||'').trim();
+  const bidang=document.getElementById('peng-bidang')?.value||'';
+  const desk=(document.getElementById('peng-deskripsi')?.value||'').trim();
+  const ps1=document.getElementById('peng-ps1')?.value||'';
+  const ps1alt=document.getElementById('peng-ps1-alt')?.value||'';
+  const ps2=document.getElementById('peng-ps2')?.value||'';
+  const jenis=document.querySelector('input[name="peng-jenis"]:checked')?.value==='Kelompok'?'kelompok':'individu';
   if(!judul){ showMsg('msg-pengajuan','Judul/topik TA wajib diisi.','err'); return; }
-  if(status==='menunggu' && !bidang){
-    showMsg('msg-pengajuan','Pilih bidang riset sebelum mengirim.','err'); return;
+  if(status==='menunggu'){
+    if(!bidang){ showMsg('msg-pengajuan','Pilih bidang riset.','err'); return; }
+    if(!ps1){ showMsg('msg-pengajuan','Pilih Pembimbing 1.','err'); return; }
+    if(!ps1alt){ showMsg('msg-pengajuan','Pembimbing 1 Alternatif wajib diisi.','err'); return; }
+    if(ps1===ps1alt){ showMsg('msg-pengajuan','PS1 dan PS1 Alternatif tidak boleh sama.','err'); return; }
   }
-
   showMsg('msg-pengajuan','Menyimpan...','info');
   try{
-    const payload = {
-      user_id: ME.id,
-      angkatan: ME.angkatan || '2022',
-      judul_sementara: judul,
-      bidang_riset: bidang,
-      deskripsi: desk,
-      status,
-      updated_at: new Date().toISOString(),
-    };
-    const { data, error } = await db().from('pengajuan_ta')
-      .upsert(payload, {onConflict:'user_id'}).select().single();
+    const payload={user_id:ME.id,angkatan:ME.angkatan||'2022',judul_sementara:judul,bidang_riset:bidang,deskripsi:desk,jenis_ta:jenis,status,updated_at:new Date().toISOString(),ps1_pilihan:ps1||null,ps1_alt_pilihan:ps1alt||null,ps2_pilihan:ps2||null,nim_kelompok:window._partnerData?.nim||null,nama_kelompok:window._partnerData?.nama||null};
+    const {data,error}=await db().from('pengajuan_ta').upsert(payload,{onConflict:'user_id'}).select().single();
     if(error) throw error;
-    myPengajuan = data;
-    renderPengajuanStatus();
-    renderTracker();
-    renderDashboardDosen();
-    showMsg('msg-pengajuan',
-      status==='menunggu'
-        ? '✅ Pengajuan berhasil dikirim ke koordinator!'
-        : '✅ Draft berhasil disimpan!', 'ok');
+    myPengajuan=data;
+    if(status==='menunggu'&&jenis==='kelompok'&&window._partnerData?.nim) await syncKelompok(payload);
+    renderPengajuanStatus(); renderTracker(); renderDashboardDosen();
+    showMsg('msg-pengajuan',status==='menunggu'?'✅ Pengajuan dikirim ke koordinator!':'✅ Draft disimpan!','ok');
   }catch(e){ showMsg('msg-pengajuan','Gagal: '+e.message,'err'); }
 }
 
+async function syncKelompok(payload){
+  try{
+    const {data:pu}=await db().from('users').select('id').eq('nim_or_inisial',window._partnerData.nim).maybeSingle();
+    if(!pu) return;
+    const {data:ex}=await db().from('pengajuan_ta').select('id,status').eq('user_id',pu.id).maybeSingle();
+    if(ex&&ex.status!=='draft') return;
+    await db().from('pengajuan_ta').upsert({...payload,user_id:pu.id,nim_kelompok:ME.nim_or_inisial,nama_kelompok:ME.nama},{onConflict:'user_id'});
+  }catch(e){ console.warn('syncKelompok:',e.message); }
+}
+
 function renderTracker(){
-  const el = document.getElementById('peng-tracker');
-  if(!el) return;
-  const s = myPengajuan?.status||'';
-  const steps = [
-    { key:'draft',     icon: s==='draft'||!s?'📝':'✓',
-      label:'Isi form pengajuan',
-      sub: s==='draft'||!s ? 'Sedang diisi' : 'Selesai',
-      state: !s?'active': s==='draft'?'active':'done' },
-    { key:'menunggu',  icon: s==='menunggu'?'⏳':'✓',
-      label:'Kirim ke koordinator',
-      sub: s==='menunggu'?'Menunggu diproses': s==='disetujui'||s==='final'?'Sudah dikirim':'Belum dikirim',
-      state: s==='menunggu'?'active': s==='disetujui'||s==='final'?'done':'wait' },
-    { key:'disetujui', icon: s==='disetujui'?'👨‍🏫':'✓',
-      label:'Koordinator assign dosen',
-      sub: s==='disetujui'||s==='final'
-        ? `PS1: ${myPengajuan?.ps1_inisial||'—'}${myPengajuan?.ps2_inisial?' · PS2: '+myPengajuan.ps2_inisial:''}`
-        : 'Menunggu',
-      state: s==='disetujui'?'active': s==='final'?'done':'wait' },
-    { key:'final', icon:'🎉',
-      label:'Dosen pembimbing final diumumkan',
-      sub: s==='final'
-        ? 'Selamat! Proses pengajuan selesai.'
-        : 'Akan diumumkan oleh koordinator',
-      state: s==='final'?'done':'wait' },
+  const el=document.getElementById('peng-tracker'); if(!el) return;
+  const s=myPengajuan?.status||'';
+  const steps=[
+    {icon:s&&s!=='draft'?'✓':'📝',label:'Isi form pengajuan',sub:!s||s==='draft'?'Sedang diisi':'Selesai',state:!s?'active':s==='draft'?'active':'done'},
+    {icon:s==='menunggu'?'⏳':'✓',label:'Kirim ke koordinator',sub:s==='menunggu'?'Menunggu diproses':s==='disetujui'||s==='final'?'Sudah dikirim':'Belum dikirim',state:s==='menunggu'?'active':s==='disetujui'||s==='final'?'done':'wait'},
+    {icon:s==='disetujui'?'👨‍🏫':'✓',label:'Koordinator assign dosen',sub:s==='disetujui'||s==='final'?`PS1: ${myPengajuan?.ps1_inisial||'—'}${myPengajuan?.ps2_inisial?' · PS2: '+myPengajuan.ps2_inisial:''}`:'Menunggu',state:s==='disetujui'?'active':s==='final'?'done':'wait'},
+    {icon:'🎉',label:'Dosen pembimbing final diumumkan',sub:s==='final'?'Selamat! Proses selesai.':'Akan diumumkan koordinator',state:s==='final'?'done':'wait'},
   ];
-  el.innerHTML = '<div class="tracker">' + steps.map(st=>`
-    <div class="tracker-step">
-      <div class="tracker-dot ${st.state}">${st.state==='done'?'✓':st.icon}</div>
-      <div class="tracker-info">
-        <div class="tracker-label" style="color:${st.state==='wait'?'var(--muted)':'var(--text)'}">${st.label}</div>
-        <div class="tracker-sub">${st.sub}</div>
-      </div>
-    </div>`).join('') + '</div>';
+  el.innerHTML='<div class="tracker">'+steps.map(st=>`<div class="tracker-step"><div class="tracker-dot ${st.state}">${st.state==='done'?'✓':st.icon}</div><div class="tracker-info"><div class="tracker-label" style="color:${st.state==='wait'?'var(--muted)':'var(--text)'}">${st.label}</div><div class="tracker-sub">${st.sub}</div></div></div>`).join('')+'</div>';
 }
 
 function renderDashboardDosen(){
-  const card  = document.getElementById('dash-dosen-card');
-  const badge = document.getElementById('dash-dosen-badge');
-  const info  = document.getElementById('dash-dosen-info');
+  const card=document.getElementById('dash-dosen-card');
+  const badge=document.getElementById('dash-dosen-badge');
+  const info=document.getElementById('dash-dosen-info');
   if(!card) return;
-  if(!myPengajuan || (!myPengajuan.ps1_inisial)){
-    card.style.display='none'; return;
-  }
+  if(!myPengajuan||!myPengajuan.ps1_inisial){ card.style.display='none'; return; }
   card.style.display='block';
-  const ps1n = adminDB?.dosen?.[myPengajuan.ps1_inisial]||myPengajuan.ps1_inisial;
-  const ps2n = myPengajuan.ps2_inisial
-    ? (adminDB?.dosen?.[myPengajuan.ps2_inisial]||myPengajuan.ps2_inisial) : null;
-  const isFinal = myPengajuan.status==='final';
-  badge.className = isFinal?'badge b-disetujui':'badge b-menunggu';
-  badge.textContent = isFinal?'Final ✓':'Sementara';
-  info.innerHTML = `
-    <div style="font-size:13px;">
-      <strong>PS1:</strong> <span class="tag">${myPengajuan.ps1_inisial}</span> ${ps1n.split(',')[0]}
-      ${ps2n?`<br><strong>PS2:</strong> <span class="tag">${myPengajuan.ps2_inisial}</span> ${ps2n.split(',')[0]}`:''}
-    </div>`;
+  const isFinal=myPengajuan.status==='final';
+  const ps1n=adminDB?.dosen?.[myPengajuan.ps1_inisial]||myPengajuan.ps1_inisial;
+  const ps2n=myPengajuan.ps2_inisial?(adminDB?.dosen?.[myPengajuan.ps2_inisial]||myPengajuan.ps2_inisial):null;
+  badge.className=isFinal?'badge b-disetujui':'badge b-menunggu';
+  badge.textContent=isFinal?'Final ✓':'Sementara';
+  info.innerHTML=`<div style="font-size:13px;line-height:1.8"><div><strong>PS1:</strong> <span class="tag">${myPengajuan.ps1_inisial}</span> ${ps1n.split(',')[0]}</div>${ps2n?`<div><strong>PS2:</strong> <span class="tag">${myPengajuan.ps2_inisial}</span> ${ps2n.split(',')[0]}</div>`:''}</div>`;
 }
+
+
 
 
 // ══════════════════════════════════════════════
